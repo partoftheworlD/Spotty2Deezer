@@ -73,10 +73,14 @@ class Deezer:
             except IndexError:
                 print(f'Not found {query}')
 
+# Spotify token https://accounts.spotify.com/authorize?response_type=token&client_id=<client_id>&scope=playlist-read-private&redirect_uri=http://localhost:5000/callback
+# Deezer code   https://connect.deezer.com/oauth/auth.php?perms=manage_library&app_id=<app_id>&redirect_uri=http://localhost:5000/callback
+# Deezer token  https://connect.deezer.com/oauth/access_token.php?app_id={app_id}&secret={secret}&code={code}
 if __name__ == '__main__':
-    spotify = Spotify('<ACCESS-TOKEN>',
+    spotify = Spotify('<TOKEN>',
                       '<PLAYLIST-ID>')
     spotify.getPlaylist()
+
     deezer = Deezer(spotify.playlist_name,
                     spotify.track_list,
                     '<ACCESS-TOKEN>',
