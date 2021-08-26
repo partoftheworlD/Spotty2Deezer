@@ -1,12 +1,16 @@
 import json
 import requests
+import re
+import socket
+import webbrowser
 
 class Spotify:
-    def __init__(self, token, playlist_id) -> None:
+    def __init__(self, client_id, playlist_id) -> None:
         self.track_list = []
-        self.token = token
-        self.header = { 'Accept': 'application/json',
-                        'Authorization': f'Bearer {self.token}'}
+        self.token = ''
+        self.code = ''
+        self.client_id = client_id
+        self.header = {}
         self.playlist_api = 'https://api.spotify.com/v1/playlists/'
         self.playlist_id = playlist_id
         self.playlist_name = ''
@@ -20,6 +24,18 @@ class Spotify:
             self.playlist_name = self.body['name']
         else:
             print('[+] ', response.status_code)
+
+    def getToken(self):
+        rc = re.compile(r'(=[A-Za-z0-9\-\_]+).*')
+        # TODO: Doesn't work like a Deezer version
+        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server.bind(('0.0.0.0', 5000))
+        server.listen(1)
+        webbrowser.open(f'https://accounts.spotify.com/authorize?response_type=token&client_id={self.client_id}&scope=playlist-read-private&redirect_uri=http://localhost:5000/callback')
+        (client, _) = server.accept()
+        self.code = re.findall(rc, str(client.recv(512)))
+        server.close()
+        self.header = {'Accept': 'application/json','Authorization': f'Bearer {self.token}'}
     
     def getPlaylist(self):
         self.getPlaylistInfo()
@@ -48,18 +64,47 @@ class Spotify:
         
 
 class Deezer:
-    def __init__(self, playlist_name, track_list, access_token, user_id) -> None:
-        self.access_token = access_token
+    def __init__(self, playlist_name, track_list, app_id, secret) -> None:
+        self.app_id = app_id
+        self.secret = secret
+        self.access_token = ''
         self.playlist_name = playlist_name
-        self.user_id = user_id
+        self.user_id = ''
         self.playlist_id = ''
         self.track_list = track_list
+        self.code = ''
 
     def createPlaylist(self):
         response = requests.post(
             f'https://api.deezer.com/user/{self.user_id}/playlists/?title={self.playlist_name}&request_method=post&access_token={self.access_token}')
         if response.status_code == requests.status_codes.codes.ok:        
             self.playlist_id = response.json()['id']
+
+    def getCode(self):
+        rc = re.compile('(fr[a-z0-9]+).*')
+        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server.bind(('0.0.0.0', 5000))
+        server.listen(1)
+        webbrowser.open(
+            f'https://connect.deezer.com/oauth/auth.php?perms=manage_library&app_id={self.app_id}&redirect_uri=http://localhost:5000/callback')
+        (client, _) = server.accept()
+        if client:
+            self.code = re.findall(rc, str(client.recv(64)))[0]
+            client.close()
+
+    def getToken(self):
+        self.getCode()
+        rc = re.compile('(fr[0-9a-zA-Z]+).*')
+        data = requests.get(
+            f'https://connect.deezer.com/oauth/access_token.php?app_id={self.app_id}\
+                &secret={self.secret}&code={self.code}').text
+        self.access_token = re.findall(rc, data)[0]
+        self.getUserID()
+
+    
+    def getUserID(self):
+        self.user_id = requests.get(f'https://api.deezer.com/user/me?access_token={self.access_token}').json()['id']
+
 
     def addTracks(self):
         for query in [track for idx in range(len(self.track_list)) for track in self.track_list[idx]]:
@@ -73,19 +118,17 @@ class Deezer:
             except IndexError:
                 print(f'Not found {query}')
 
-# Spotify token https://accounts.spotify.com/authorize?response_type=token&client_id=<client_id>&scope=playlist-read-private&redirect_uri=http://localhost:5000/callback
-# Deezer code   https://connect.deezer.com/oauth/auth.php?perms=manage_library&app_id=<app_id>&redirect_uri=http://localhost:5000/callback
-# Deezer token  https://connect.deezer.com/oauth/access_token.php?app_id={app_id}&secret={secret}&code={code}
 if __name__ == '__main__':
-    spotify = Spotify('<TOKEN>',
-                      '<PLAYLIST-ID>')
+    spotify = Spotify('',
+                      '')
+    spotify.getToken()
     spotify.getPlaylist()
-
+    print(spotify.track_list)
     deezer = Deezer(spotify.playlist_name,
                     spotify.track_list,
-                    '<ACCESS-TOKEN>',
-                    '<USER-ID>')
-
+                    '',
+                    '')
+    deezer.getToken()
     deezer.createPlaylist()
     deezer.addTracks()
     
