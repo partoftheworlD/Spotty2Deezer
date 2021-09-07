@@ -1,4 +1,4 @@
-# Spotty2Deezer 📻
+# Spotty2Deezer 📻 ( Moved to archive because Deezer is useless and has many problems with the recommendation algorithm )
 
 ### Just a simple project which allows you to import your spotify's playlist to Deezer
 
